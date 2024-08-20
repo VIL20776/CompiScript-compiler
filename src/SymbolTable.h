@@ -29,7 +29,7 @@ parent - Exclusivo de clases, indica de que clase hereda
 namespace - Si pertenece a una funcion o clase, el nombre se indica aqui
 type - Tipo de simbolo
 data_type - Tipo de dato. 
-    Si es función o cerradura, es nil o el tipo de la variable a retornar.
+    Si es función o cerradura, es nil o any.
     Si es clase, valor que lo identifica.
     Si es objeto, valor de la clase.
     Valores negativos para identificar datos primitivos.
@@ -77,16 +77,16 @@ public:
     // Current Scope operations
 
     void insert(SymbolData &symbol);
-    SymbolData find(std::string &symbol_name);
-    void update(std::string &symbol_name, SymbolData symbol);
+    std::pair<SymbolData, int> find(std::string &symbol_name);
+    int update(std::string &symbol_name, SymbolData symbol);
 
     // Selected Scope operations
 
-    SymbolData find(std::string &symbol_name, unsigned int &scope);
+    std::pair<SymbolData, int> find(std::string &symbol_name, unsigned int &scope);
 
-    /*Crea un nuevo ambito y lo selecciona como el ambito actual*/
+    /*Entra a un nuevo ambito*/
     int enter();
 
-    /*Cierra el ambito actual y regresa al ambito anterior*/
+    /*Regresa al ambito anterior*/
     int exit();
 };
