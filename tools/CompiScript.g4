@@ -1,44 +1,67 @@
-grammar Compiscript;
+grammar CompiScript;
 
-program : declaration* EOF;
+program         : declaration* EOF ;
 
-WS: [ \t\r\n]+ -> skip;
+declaration     : classDecl
+                | funDecl
+                | varDecl
+                | statement ;
 
-declaration : classDecl | funDecl | varDecl | statement;
-classDecl : 'class ' IDENTIFIER ('<' IDENTIFIER)? '{' function* '}';
-funDecl : 'fun ' function;
-varDecl : 'var ' IDENTIFIER ('=' expression)? ';';
+classDecl       : 'class' IDENTIFIER ('extends' IDENTIFIER)? '{' function* '}' ;
+funDecl         : 'fun' function ;
+varDecl         : 'var' IDENTIFIER ('=' expression)? ';' ;
 
-statement : exprStmt | forStmt | ifStmt | printStmt | returnStmt | whileStmt | block;
-exprStmt : expression ';';
-forStmt : 'for ' '(' (varDecl | exprStmt | ';') expression? ';' expression? ')' statement;
-ifStmt : 'if' '(' expression ')' statement ('else' statement)?;
-printStmt : 'print ' expression ';';
-returnStmt : 'return ' expression? ';';
-whileStmt : 'while ' '(' expression ')' statement;
+statement       : exprStmt
+                | forStmt
+                | ifStmt
+                | printStmt
+                | returnStmt
+                | whileStmt
+                | block ;
 
-block : '{' declaration* '}';
-expression : assignment;
-assignment : (call '.')? IDENTIFIER '=' assignment | logic_or;
+exprStmt        : expression ';' ;
+forStmt         : 'for' '(' (varDecl | exprStmt | ';') expression? ';' expression? ')' statement ;
+ifStmt          : 'if' '(' expression ')' statement ('else' statement)? ;
+printStmt       : 'print' expression ';' ;
+returnStmt      : 'return' expression? ';' ;
+whileStmt       : 'while' '(' expression ')' statement ;
+block           : '{' declaration* '}' ;
+funAnon         : 'fun' '(' parameters? ')' block;
 
-logic_or : logic_and (' or ' logic_and)*;
-logic_and : equality (' and ' equality)*;
-equality : comparison (( '!=' | '==' ) comparison)*;
-comparison : term (( '>' | '>=' | '<' | '<=' ) term)*;
+expression      : assignment
+                | funAnon;
 
-term : factor (( '' | '/' | '%') factor)*;
-factor : unary (( '-' | '+' ) unary)*;
-unary : ( '!' | '-' ) unary | call;
-call : primary ( '(' arguments? ')' | '.' IDENTIFIER );
-primary : 'true' | 'false' | 'nil' | 'this' | NUMBER | STRING | IDENTIFIER | '(' expression ')' | 'super' '.' IDENTIFIER;
+assignment      : (call '.')? IDENTIFIER '=' assignment
+                | logic_or;
 
-function : IDENTIFIER '(' parameters? ')' block;
-parameters : IDENTIFIER ( ',' IDENTIFIER ) *;
-arguments : expression ( ',' expression ) *;
+logic_or        : logic_and ('or' logic_and)* ;
+logic_and       : equality ('and' equality)* ;
+equality        : comparison (( '!=' | '==' ) comparison)* ;
+comparison      : term (( '>' | '>=' | '<' | '<=' ) term)* ;
+term            : factor (( '-' | '+' ) factor)* ;
+factor          : unary (( '/' | '*' | '%' ) unary)* ;
+array           : '[' (expression (',' expression)*)? ']';
+instantiation   : 'new' IDENTIFIER '(' arguments? ')';
 
-NUMBER : DIGIT+ ( '.' DIGIT+ )?;
-STRING : '"' (~["\])'"';
-IDENTIFIER: ALPHA(ALPHA|DIGIT);
+unary           : ( '!' | '-' ) unary
+                | call ;
 
-fragment ALPHA:[a-zA-Z];
-fragment DIGIT:[0-9];
+call            : primary ( '(' arguments? ')' | '.' IDENTIFIER | '[' expression ']')* 
+                | funAnon;
+
+primary         : 'true' | 'false' | 'nil' | 'this'
+                | NUMBER | STRING | IDENTIFIER | '(' expression ')'
+                | 'super' '.' IDENTIFIER 
+                | array | instantiation;
+
+function        : IDENTIFIER '(' parameters? ')' block ;
+parameters      : IDENTIFIER ( ',' IDENTIFIER )* ;
+arguments       : expression ( ',' expression )* ;
+
+NUMBER          : DIGIT+ ( '.' DIGIT+ )? ;
+STRING          : '"' (~["\\])* '"' ;
+IDENTIFIER      : ALPHA ( ALPHA | DIGIT )* ;
+fragment ALPHA  : [a-zA-Z_] ;
+fragment DIGIT  : [0-9] ;
+WS              : [ \t\r\n]+ -> skip ;
+ONE_LINE_COMMENT: '//' (~ '\n')* '\n'? -> skip;
