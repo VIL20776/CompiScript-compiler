@@ -5,50 +5,46 @@
 #include <vector>
 #include <unordered_map>
 
-enum SymbolType: int {
+enum class SymbolType: int {
     VARIABLE,
     FUNCTION,
     PARAMETER,
     CLASS,
-    OBJECT,
-    CLOSURE
+    CLOSURE,
+    ARRAY
 };
 
-enum SymbolDataType: int {
-    UNDEFINED = 0,
-    NUMBER = -1,
-    STRING = -2,
-    BOOLEAN = -3,
-    NIL = -4,
-    ANY = -5 // Placeholder para otros tipos
+enum class SymbolDataType: int {
+    UNDEFINED,
+    NUMBER,
+    STRING,
+    BOOLEAN,
+    NIL,
+    ANY // Placeholder para otros tipos
 };
 
 /*
 name - Identificacion
-parent - Exclusivo de clases, indica de que clase hereda 
-namespace - Si pertenece a una funcion o clase, el nombre se indica aqui
+scope - Ambito nombrado. Default = "local"
+    Si es variable, indica la clase de la que es instancia.
+    Si es funcion, indica a cual clase pertenece.
+    Si es parametro, indica a que funcion pertenece.
+    Si es clase, indica de que clase hereda
 type - Tipo de simbolo
 data_type - Tipo de dato. 
     Si es función o cerradura, es nil o any.
-    Si es clase, valor que lo identifica.
-    Si es objeto, valor de la clase.
-    Valores negativos para identificar datos primitivos.
-    Valores positivos para clases definidas.
-    El valor 0 indica que no está definido.
-value - Valor contenido, exclusivo de variables.
-    Vacio para funciones, clases, objetos y cerraduras.
-scope - Ambito, 0 es global
+    Si es clase u objeto, es any.
+value - Valor contenido en la variable.    
 size - Tamaño del símbolo
 offset - ubicacion en memoria
 
 */
 struct SymbolData {
     std::string name;
-    std::string parent;
+    std::string scope;
     SymbolType type;
-    int data_type; 
+    SymbolDataType data_type; 
     std::string value;
-    int scope;
     int size;
     int offset;
 };
@@ -66,27 +62,24 @@ private:
         }
     };
 
-    unsigned int scopes;
-    unsigned int current_scope;
-    std::multimap<unsigned int, unsigned> scope_map; // to -> from
-    std::unordered_map<std::pair<std::string, int>, SymbolData, pair_hash> table;
+    SymbolTable* parent;
+    std::unordered_map<
+        std::pair<std::string, std::string>, 
+        SymbolData, 
+        pair_hash
+    > table;
+    
 public:
-    SymbolTable();
+    SymbolTable(SymbolTable* parent = nullptr);
     ~SymbolTable();
 
-    // Current Scope operations
+    void insert(const SymbolData &symbol);
 
-    void insert(SymbolData &symbol);
-    std::pair<SymbolData, int> find(std::string &symbol_name);
-    int update(std::string &symbol_name, SymbolData symbol);
+    /*Find symbols matching parent symbol*/
+    std::vector<SymbolData> find_range(const std::string &scope);
 
-    // Selected Scope operations
+    std::pair<SymbolData, bool> find(const std::string &symbol_name, const std::string &scope = "local");
 
-    std::pair<SymbolData, int> find(std::string &symbol_name, unsigned int &scope);
+    bool update(const std::string &symbol_name, const SymbolData &symbol, const std::string &scope = "local");
 
-    /*Entra a un nuevo ambito*/
-    int enter();
-
-    /*Regresa al ambito anterior*/
-    int exit();
 };
