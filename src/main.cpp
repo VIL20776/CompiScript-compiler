@@ -1,4 +1,4 @@
-#include "antlr4-runtime.h"
+#include <antlr4-runtime.h>
 
 #include "generated/CompiScriptBaseListener.h"
 #include "generated/CompiScriptListener.h"
@@ -10,63 +10,101 @@
 #include <vector>
 #include <stack>
 
-int tableIndex = 0;
-std::stack<SymbolTable> tables;
-SymbolTable currentTable = SymbolTable();
-
 class CompiScriptSemanticChecker: public CompiScriptBaseListener
 {
-    SymbolData currentSymbol = {};
+    SymbolTable *table = new SymbolTable();
+    SymbolData current_symbol;
+    std::string named_scope = "local";
+    std::stack<SymbolData> symbol_stack;
 
+    public:
     void enterClassDecl(CompiScriptParser::ClassDeclContext *ctx) override {
-        auto ids = ctx->IDENTIFIER();
+        std::string name = ctx->IDENTIFIER()[0]->getText();
 
-        if (currentTable.lookup(ids[0]->getText())) {
-            std::cerr << "Error: Class " << ids[0]->getText() << " already declared" << std::endl;
-            exit(1);
+        auto found_symbol = table->find(name);
+        if (found_symbol.second)
+            std::cerr << "Error: El nombre" << name << "ya ha sido usado\n";
+
+        current_symbol = SymbolData();
+        current_symbol.name = name;
+        if (ctx->IDENTIFIER().size() > 1) {
+            std::string scope = ctx->IDENTIFIER()[0]->getText();
+            found_symbol = table->find(scope);
+            if (!found_symbol.second)
+                std::cerr << "Error: No existe la clase con el nombre" << scope << "\n";
+
+            current_symbol.scope = scope;
         }
 
-        currentSymbol.name = ids[0]->getText();
-        currentSymbol.type = SymbolType::CLASS;
-        currentSymbol.data_type = "";
-
-        currentTable.bind(currentSymbol);
-
-        tables.push(currentTable);
-        currentTable = SymbolTable();
-        tableIndex++;
+        current_symbol.type = SymbolType::CLASS;
+        current_symbol.data_type = SymbolDataType::ANY;
+        symbol_stack.push(current_symbol);
     }
 
     void exitClassDecl(CompiScriptParser::ClassDeclContext *ctx) override {
-        tables.pop();
-        tableIndex--;
-        currentTable = tables.top();
-
-        currentSymbol.method_table_index = tableIndex + 1;
-        currentTable.update(currentSymbol.name, currentSymbol);
-
-        currentSymbol = SymbolData();
+        current_symbol = symbol_stack.top();
+        table->insert(current_symbol);
+        symbol_stack.pop();
     }
 
-    void enterFunction(CompiScriptParser::FunctionContext *ctx) override {
-        auto id = ctx->IDENTIFIER();
-        auto params = ctx->parameters();
-        auto block = ctx->block();
+    void enterFunDecl(CompiScriptParser::FunDeclContext *ctx) override {
+        current_symbol = SymbolData();
+        current_symbol.type = SymbolType::FUNCTION;
+    }
 
-        if (currentTable.lookup(id->getText())) {
-            std::cerr << "Error: Function " << id->getText() << " already declared" << std::endl;
-            exit(1);
+    void exitFunDecl(CompiScriptParser::FunDeclContext *ctx) override {
+        table->insert(current_symbol);
+    }
+
+    void enterVarDecl(CompiScriptParser::VarDeclContext *ctx) override {
+        current_symbol = SymbolData();
+        current_symbol.type = SymbolType::VARIABLE;
+    }
+
+    void exitVarDecl(CompiScriptParser::VarDeclContext *ctx) override {
+        table->insert(current_symbol);
+    }
+
+    void enterAssignment(CompiScriptParser::AssignmentContext *ctx) override {
+        if (ctx->logic_or() != nullptr)
+            return;
+        
+        auto id = ctx->IDENTIFIER()->getText();
+        auto [symbol, found] = table->find(id, named_scope);
+        if (!found)
+            std::cerr << "Error: Symbolo no definido" << "\n";
+    }
+
+    void enterCall(CompiScriptParser::CallContext *ctx) override {
+        if (ctx->funAnon() != nullptr)
+            return;
+
+        auto id = ctx->IDENTIFIER()[0]->getText();
+        auto [symbol, found] = table->find(id, named_scope);
+        if (!found)
+            std::cerr << "Error: Symbolo no definido" << "\n";
+    }
+
+    void enterPrimary(CompiScriptParser::PrimaryContext *ctx) override {
+        if (ctx->IDENTIFIER() != nullptr) {
+            auto id = ctx->IDENTIFIER()->getText();
+            auto prevToken = ctx->getStart();
+            if (prevToken != nullptr && prevToken->getText() == "super") {
+                printf("Super\n");
+            }
         }
-
-        currentSymbol.name = id->getText();
-        currentSymbol.type = SymbolType::FUNCTION;
-        currentSymbol.data_type = "";
-
-        currentTable.bind(currentSymbol);
-
     }
+
 };
 
 int main () {
+    auto input = antlr4::ANTLRInputStream("super.a;");
+    CompiScriptLexer lexer(&input);
+    antlr4::CommonTokenStream tokens(&lexer);
+    CompiScriptParser parser(&tokens);
+    antlr4::tree::ParseTree *tree = parser.program();
+    CompiScriptSemanticChecker checker;
+    antlr4::tree::ParseTreeWalker::DEFAULT.walk(&checker, tree);
+
     return 0;
 }
