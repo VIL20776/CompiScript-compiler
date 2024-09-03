@@ -17,7 +17,7 @@ ExternalProject_Add(
     
     PATCH_COMMAND ""
 
-    CMAKE_ARGS -DCMAKE_CXX_STANDARD=20 -DCMAKE_INSTALL_PREFIX=${EXTERNAL_DIR}
+    CMAKE_ARGS -DCMAKE_CXX_STANDARD=20 -DANTLR4_INSTALL=true -DCMAKE_INSTALL_PREFIX=${EXTERNAL_DIR}
 )
 
 find_package(antlr4-runtime REQUIRED PATHS ${EXTERNAL_DIR})
@@ -32,16 +32,18 @@ add_library(cscript_lang STATIC
 
 add_dependencies(cscript_lang antlr4_static)
 
-target_include_directories(cscript_lang PUBLIC 
+target_include_directories(cscript_lang PRIVATE 
     ${ANTLR4_INCLUDE_DIR}
 )
 
-target_link_libraries(cscript_lang PUBLIC antlr4_static)
+target_link_libraries(cscript_lang PRIVATE antlr4_static)
 
-add_executable(czc src/main.cpp)
+add_executable(czc src/main.cpp
+    src/SymbolTable.cpp
+)
 
-target_include_directories(czc PUBLIC src ${ANTLR4_INCLUDE_DIR})
+target_include_directories(czc PRIVATE src ${ANTLR4_INCLUDE_DIR})
 
-target_link_libraries(czc PRIVATE cscript_lang)
+target_link_libraries(czc PRIVATE cscript_lang antlr4_static)
 
 
