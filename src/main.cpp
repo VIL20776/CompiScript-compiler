@@ -1,4 +1,4 @@
-#include <antlr4-runtime.h>
+#include "antlr4-runtime.h"
 
 #include "generated/CompiScriptBaseListener.h"
 #include "generated/CompiScriptListener.h"
@@ -19,7 +19,7 @@ class CompiScriptSemanticChecker: public CompiScriptBaseListener
 
     public:
     void enterClassDecl(CompiScriptParser::ClassDeclContext *ctx) override {
-        std::string name = ctx->IDENTIFIER()[0]->getText();
+        std::string name = ctx->IDENTIFIER(0)->getText();
 
         auto found_symbol = table->find(name);
         if (found_symbol.second)
@@ -28,7 +28,7 @@ class CompiScriptSemanticChecker: public CompiScriptBaseListener
         current_symbol = SymbolData();
         current_symbol.name = name;
         if (ctx->IDENTIFIER().size() > 1) {
-            std::string scope = ctx->IDENTIFIER()[0]->getText();
+            std::string scope = ctx->IDENTIFIER(1)->getText();
             found_symbol = table->find(scope);
             if (!found_symbol.second)
                 std::cerr << "Error: No existe la clase con el nombre" << scope << "\n";
@@ -79,8 +79,11 @@ class CompiScriptSemanticChecker: public CompiScriptBaseListener
         if (ctx->funAnon() != nullptr)
             return;
 
-        auto id = ctx->IDENTIFIER()[0]->getText();
-        auto [symbol, found] = table->find(id, named_scope);
+        if (ctx->IDENTIFIER().empty())
+            return;
+        
+        auto id = ctx->IDENTIFIER(0);
+        auto [symbol, found] = table->find(id->getText(), named_scope);
         if (!found)
             std::cerr << "Error: Symbolo no definido" << "\n";
     }
@@ -90,7 +93,7 @@ class CompiScriptSemanticChecker: public CompiScriptBaseListener
             auto id = ctx->IDENTIFIER()->getText();
             auto prevToken = ctx->getStart();
             if (prevToken != nullptr && prevToken->getText() == "super") {
-                printf("Super\n");
+                
             }
         }
     }
@@ -98,7 +101,7 @@ class CompiScriptSemanticChecker: public CompiScriptBaseListener
 };
 
 int main () {
-    auto input = antlr4::ANTLRInputStream("super.a;");
+    auto input = antlr4::ANTLRInputStream("super.my_id;");
     CompiScriptLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
     CompiScriptParser parser(&tokens);
