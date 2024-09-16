@@ -25,7 +25,7 @@ enum class SymbolDataType: int {
 
 /*
 name - Identificacion
-scope - Ambito nombrado. Default = "local"
+label - Etiqueta identificadora:
     Si es variable, indica la clase de la que es instancia.
     Si es funcion, indica a cual clase pertenece.
     Si es parametro, indica a que funcion pertenece.
@@ -41,7 +41,7 @@ offset - ubicacion en memoria
 */
 struct SymbolData {
     std::string name;
-    std::string scope;
+    std::string label;
     SymbolType type;
     SymbolDataType data_type; 
     std::string value;
@@ -62,24 +62,30 @@ private:
         }
     };
 
-    SymbolTable* parent;
+    using Table = 
     std::unordered_map<
         std::pair<std::string, std::string>, 
         SymbolData, 
         pair_hash
-    > table;
+    >;
+
+    Table current_scope;
+    std::vector<Table> scopes;
     
 public:
-    SymbolTable(SymbolTable* parent = nullptr);
+    SymbolTable();
     ~SymbolTable();
 
     void insert(const SymbolData &symbol);
 
-    /*Find symbols matching parent symbol*/
-    std::vector<SymbolData> find_range(const std::string &scope);
+    /*Find symbols matching symbol label*/
+    std::vector<SymbolData> find_range(const std::string &label);
 
-    std::pair<SymbolData, bool> find(const std::string &symbol_name, const std::string &scope = "local");
+    std::pair<SymbolData, bool> find(const std::string &symbol_name, const std::string &label = "local");
 
     bool update(const std::string &symbol_name, const SymbolData &symbol, const std::string &scope = "local");
+
+    void enter(const std::vector<SymbolData> &initial_symbols = {});
+    void exit();
 
 };

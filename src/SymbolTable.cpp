@@ -3,8 +3,8 @@
 #include <utility>
 #include <set>
 
-SymbolTable::SymbolTable(SymbolTable *parent):
-    parent(parent), table()
+SymbolTable::SymbolTable():
+    scopes()
 {
 }
 
@@ -13,17 +13,18 @@ SymbolTable::~SymbolTable()
 }
 
 void SymbolTable::insert(const SymbolData &symbol) {
-    auto key = std::make_pair(symbol.name, "local");
-    table.emplace(key, symbol);
+    auto key = std::make_pair(symbol.name, "");
+    current_scope.emplace(key, symbol);
 }
 
 std::vector<SymbolData>
-SymbolTable::find_range(const std::string &scope) {
+SymbolTable::find_range(const std::string &label) {
     std::vector<SymbolData> symbols;
-    for (auto &kv : table) 
+    for (auto &scope: scopes)
+    for (auto &kv : scope) 
     {
         auto &key = kv.first;
-        if (key.second == scope)
+        if (key.second == label)
             symbols.push_back(kv.second);
     }
 
@@ -31,29 +32,46 @@ SymbolTable::find_range(const std::string &scope) {
 }
 
 std::pair<SymbolData, bool>
-SymbolTable::find(const std::string &symbol_name, const std::string &scope) {
+SymbolTable::find(const std::string &symbol_name, const std::string &label) {
     // Try finding in current scope
-    auto key = std::make_pair(symbol_name, scope);
-    if (table.contains(key))
-        return {table.at(key), true};
+    auto key = std::make_pair(symbol_name, label);
+    if (current_scope.contains(key))
+        return {current_scope.at(key), true};
 
-    if (parent == nullptr)
-        return {{}, false};
-
-    // Get parent scope
-    auto [symbol, found] = parent->find(symbol_name, scope);
-    if (found)
-        return {symbol, found};
+    // Find in previous scope
+    for (auto it = scopes.rbegin(); it != scopes.rend(); it++)
+        if (it->contains(key))
+            return {current_scope.at(key), true};
     
+    return {{}, false};
 }
 
 
-bool SymbolTable::update(const std::string &symbol_name, const SymbolData &symbol, const std::string &scope) {
+bool SymbolTable::update(const std::string &symbol_name, const SymbolData &symbol, const std::string &label) {
+    // Try finding in current scope
+    auto key = std::make_pair(symbol_name, label);
+    if (current_scope.contains(key)) {
+        current_scope.insert_or_assign(key, symbol);
+        return true;
+    }
 
-    auto [old_symbol, found] = find(symbol_name, scope);
-    if (!found)
-        return false;
+    // Find in previous scope
+    for (auto it = scopes.rbegin(); it != scopes.rend(); it++)
+        if (it->contains(key)) {
+            it->insert_or_assign(key, symbol);
+            return true;
+        }
+    
+    return false;
+    
+}
 
-    table.insert_or_assign({symbol_name, scope}, symbol);
-    return true;
+void SymbolTable::enter(const std::vector<SymbolData> &initial_symbols) {
+    scopes.push_back(current_scope);
+    current_scope = {};
+}
+
+void SymbolTable::exit() {
+    current_scope = scopes.back();
+    scopes.pop_back();
 }
