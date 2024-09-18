@@ -6,11 +6,10 @@
 #include <unordered_map>
 
 enum class SymbolType: int {
+    LITERAL,
     VARIABLE,
     FUNCTION,
-    PARAMETER,
     CLASS,
-    CLOSURE,
     ARRAY
 };
 
@@ -19,6 +18,7 @@ enum class SymbolDataType: int {
     NUMBER,
     STRING,
     BOOLEAN,
+    OBJECT,
     NIL,
     ANY // Placeholder para otros tipos
 };
@@ -26,15 +26,17 @@ enum class SymbolDataType: int {
 /*
 name - Identificacion
 label - Etiqueta identificadora:
-    Si es variable, indica la clase de la que es instancia.
+    Si es variable de tipo de dato OBJECT, indica la clase de la que es instancia.
+        Si es cualquier otro tipo de dato, indica el objeto al que pertenece.
     Si es funcion, indica a cual clase pertenece.
-    Si es parametro, indica a que funcion pertenece.
     Si es clase, indica de que clase hereda
 type - Tipo de simbolo
 data_type - Tipo de dato. 
     Si es función o cerradura, es nil o any.
     Si es clase u objeto, es any.
-value - Valor contenido en la variable.    
+value - Valor contenido en la variable.
+arg_list - Lista de argumentos para una funcion
+prop_list - Lista de propiedades de una clase.
 size - Tamaño del símbolo
 offset - ubicacion en memoria
 
@@ -45,6 +47,8 @@ struct SymbolData {
     SymbolType type;
     SymbolDataType data_type; 
     std::string value;
+    std::vector<std::string> arg_list;
+    std::vector<std::string> prop_list;
     int size;
     int offset;
 };
@@ -81,9 +85,9 @@ public:
     /*Find symbols matching symbol label*/
     std::vector<SymbolData> find_range(const std::string &label);
 
-    std::pair<SymbolData, bool> find(const std::string &symbol_name, const std::string &label = "local");
+    std::pair<SymbolData, bool> find(const std::string &symbol_name, const std::string &label = "");
 
-    bool update(const std::string &symbol_name, const SymbolData &symbol, const std::string &scope = "local");
+    bool update(const std::string &symbol_name, const SymbolData &symbol, const std::string &label = "");
 
     void enter(const std::vector<SymbolData> &initial_symbols = {});
     void exit();
