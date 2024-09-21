@@ -35,8 +35,8 @@ data_type - Tipo de dato.
     Si es función o cerradura, es nil o any.
     Si es clase u objeto, es any.
 value - Valor contenido en la variable.
-arg_list - Lista de argumentos para una funcion
-prop_list - Lista de propiedades de una clase.
+arg_list - Lista de argumentos para una funcion, una variable con argumentos es una cerradura.
+prop_list - Lista de propiedades de una clase, una variable con propiedades es un objeto.
 size - Tamaño del símbolo
 offset - ubicacion en memoria
 
