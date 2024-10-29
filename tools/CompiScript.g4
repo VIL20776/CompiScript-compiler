@@ -40,19 +40,17 @@ equality        : comparison (( '!=' | '==' ) comparison)* ;
 comparison      : term (( '>' | '>=' | '<' | '<=' ) term)* ;
 term            : factor (( '-' | '+' ) factor)* ;
 factor          : unary (( '/' | '*' | '%' ) unary)* ;
-array           : '[' (expression (',' expression)*)? ']';
 instantiation   : 'new' IDENTIFIER '(' arguments? ')';
 
 unary           : ( '!' | '-' ) unary
                 | call ;
 
-call            : primary ( '(' arguments? ')' | '.' IDENTIFIER | '[' expression ']')* 
+call            : primary ( '(' arguments? ')' | '.' IDENTIFIER )* 
                 | funAnon;
 
-primary         : 'true' | 'false' | 'nil' | 'this'
+primary         : 'true' | 'false' | 'nil' | 'this' | 'super'
                 | NUMBER | STRING | IDENTIFIER | '(' expression ')'
-                | 'super' '.' IDENTIFIER 
-                | array | instantiation;
+                | instantiation;
 
 function        : IDENTIFIER '(' parameters? ')' block ;
 parameters      : IDENTIFIER ( ',' IDENTIFIER )* ;
