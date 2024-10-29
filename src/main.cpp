@@ -7,6 +7,7 @@
 
 #include "SymbolTable.h"
 
+#include <fstream>
 #include <vector>
 #include <stack>
 #include <any>
@@ -16,14 +17,13 @@ using std::string, std::vector, std::any, std::make_any, std::any_cast;
 class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
 {
     SymbolTable table;
-    SymbolData current_symbol;
     string current_label;
     vector<SymbolData> symbol_store;
     bool classDef = false;
 
     public:
     any visitDeclaration(CompiScriptParser::DeclarationContext *ctx) override {
-
+        return visitChildren(ctx);
     }
 
     any visitClassDecl(CompiScriptParser::ClassDeclContext *ctx) override {
@@ -33,27 +33,31 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
         if (symbol_found.second)
             std::cerr << "Error: El nombre" << name << "ya está declarado\n";
 
-        SymbolData symbol = SymbolData();
-        symbol.name = name;
+        SymbolData new_symbol = SymbolData();
+        new_symbol.name = name;
         if (ctx->IDENTIFIER().size() > 1) {
             std::string parent = ctx->IDENTIFIER(1)->getText();
             symbol_found = table.find(parent);
             if (!symbol_found.second)
                 std::cerr << "Error: No existe la clase con el nombre" << parent << "\n";
 
-            symbol.label = parent;
+            new_symbol.label = parent;
         }
 
-        symbol.type = SymbolType::CLASS;
-        symbol.data_type = SymbolDataType::ANY;
+        new_symbol.type = SymbolType::CLASS;
+        new_symbol.data_type = SymbolDataType::ANY;
 
         classDef = true;
         for (auto fun: ctx->function()) {
-            SymbolData func_symbol = any_cast<SymbolData>(visitFunction(fun, &symbol));
+            SymbolData func_symbol = any_cast<SymbolData>(visitFunction(fun, &new_symbol));
         }
+
         classDef = false;
 
+        table.insert(new_symbol);
+
         // Code Generation
+        return make_any<SymbolData>(new_symbol);
     }
 
     any visitFunDecl(CompiScriptParser::FunDeclContext *ctx) override {
@@ -61,10 +65,43 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
     }
 
     any visitVarDecl(CompiScriptParser::VarDeclContext *ctx) override {
-        current_symbol = SymbolData();
-        current_symbol.type = SymbolType::VARIABLE;
-        if (!ctx->expression())
-            current_symbol.data_type = SymbolDataType::UNDEFINED;
+        SymbolData new_symbol = SymbolData();
+        new_symbol.type = SymbolType::VARIABLE;
+        if (!ctx->expression()) {
+            new_symbol.data_type = SymbolDataType::UNDEFINED;
+            table.insert(new_symbol);
+            return make_any<SymbolData>(new_symbol);
+        }
+
+        SymbolData result = any_cast<SymbolData>(visitExpression(ctx->expression()));
+        switch (result.type)
+        {
+        case SymbolType::LITERAL:
+        case SymbolType::VARIABLE:
+        case SymbolType::ARRAY:
+            new_symbol.data_type = result.data_type;
+            new_symbol.value = result.value;
+            break;
+        case SymbolType::FUNCTION:
+        case SymbolType::CLOUSURE:
+            new_symbol.label = result.name;
+            new_symbol.type = SymbolType::CLOUSURE;
+            new_symbol.data_type = result.data_type;
+            new_symbol.arg_list = result.arg_list;
+            break;
+        case SymbolType::OBJECT:
+            new_symbol.label = result.name;
+            new_symbol.type = result.type;
+            new_symbol.data_type = result.data_type;
+            new_symbol.prop_list = result.prop_list;
+            new_symbol.value = result.value;
+            break;
+        default:
+            break;
+        }
+
+        table.insert(new_symbol);
+        return make_any<SymbolData>(new_symbol);
     }
 
     any visitReturnStmt(CompiScriptParser::ReturnStmtContext *ctx) override {
@@ -77,27 +114,31 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
             any result = visitDeclaration(decl);
         }
         table.exit();
+
+        return make_any<SymbolDataType>(SymbolDataType::NIL);
     }
 
     any visitBlock(CompiScriptParser::BlockContext *ctx, const vector<SymbolData> &symbols) {
         table.enter(symbols);
         visitChildren(ctx);
+
+        any return_type = make_any<SymbolDataType>(SymbolDataType::NIL);
         for (auto decl: ctx->declaration()) {
             auto return_ptr = decl->statement()->returnStmt();
             if (return_ptr) {
-                SymbolDataType return_type = any_cast<SymbolDataType>(visitReturnStmt(return_ptr));
-                return return_type;
+                return_type = make_any<SymbolDataType>(SymbolDataType::ANY);
             }
         }
         table.exit();
 
-        return make_any<SymbolDataType>(SymbolDataType::NIL);
+        return return_type;
     }
 
     any visitAssignment(CompiScriptParser::AssignmentContext *ctx) override {
         if (ctx->logic_or() != nullptr)
             return visitLogic_or(ctx->logic_or());
         
+        // Check if an object property is being called.
         string label = "";
         if (ctx->call() != nullptr) {
             any call_value = visitCall(ctx->call());
@@ -111,6 +152,28 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
             std::cerr << "Error: Symbolo no definido" << "\n";
         
         std::any assignment_value = visitAssignment(ctx->assignment());
+    }
+
+    any visitInstantiation(CompiScriptParser::InstantiationContext *ctx) override {
+        string class_name = ctx->IDENTIFIER()->getText();
+        auto [symbol, found] = table.find(class_name);
+
+        if (!found) {
+            std::cerr << "No existe una clase con este nombre.\n";
+        }
+        // Check if arguments have been passed
+        
+        int arg_count = 0;
+        if (ctx->arguments())
+            arg_count = any_cast<vector<SymbolData>>(ctx->arguments()).size();
+
+        auto [symbol, found] = table.find("init", class_name);
+
+        if (symbol.arg_list.size() != arg_count) {
+            std::cerr << "La cantidad de argumentos no es coincide con la función constructor\n";
+        }
+
+        
     }
 
     any visitCall(CompiScriptParser::CallContext *ctx) override {
@@ -129,13 +192,6 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
                 // Check if symbol is function
 
                 visitArguments(ctx->arguments(arg_index++));
-                continue;
-            }
-
-            if (child->getText() == "[") {
-                // Check if symbol is array
-
-                visitExpression(ctx->expression(expr_index++));
                 continue;
             }
 
@@ -188,6 +244,16 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
 
             return std::make_any<SymbolData>(symbol);
         }
+        
+        if (value == "this" || value == "super") {
+            auto [symbol, found] = table.find("this");
+            if (!found) 
+                symbol.name = ctx->IDENTIFIER()->getText();
+            
+
+
+            return std::make_any<SymbolData>(symbol);
+        }
 
         if (value == "nil") {
             SymbolData symbol = {
@@ -199,7 +265,7 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
             return std::make_any<SymbolData>(symbol);
         }
 
-        // this super TODO
+        
     }
 
     any visitFunction(CompiScriptParser::FunctionContext *ctx) override {    
@@ -230,8 +296,9 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
 
         SymbolData new_symbol = {
             .name = ctx->IDENTIFIER()->getText(),
+            .label = symbol_class->name,
             .type = SymbolType::FUNCTION,
-            .data_type = SymbolDataType::ANY
+            .data_type = SymbolDataType::ANY,
         };
         
         any params = visitParameters(ctx->parameters());
@@ -240,8 +307,7 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
         SymbolData self = {
             .name = "this",
             .label = symbol_class->label,
-            .type = SymbolType::VARIABLE,
-            .data_type = SymbolDataType::OBJECT,
+            .type = SymbolType::OBJECT
         };
         vec_params.insert(vec_params.begin(), self);
         
@@ -272,19 +338,24 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
     }
 
     any visitArguments(CompiScriptParser::ArgumentsContext *ctx) override {
-        int arg_count = ctx->expression().size();
-
-        if (current_label != "") {
-            int arg_expectected = table.find_range(current_label).size();
-            if (arg_count != arg_expectected)
-                std::cerr << "Error: La cantidad de argumentos recibidos no coincide con la esperada";
-        }
+        vector<SymbolData> symbols = {};
+        for (auto arg: ctx->expression())
+            symbols.push_back(any_cast<SymbolData>(visitExpression(arg)));
+        
+        return make_any<vector<SymbolData>>(symbols);
     }
 
 };
 
-int main () {
-    auto input = antlr4::ANTLRInputStream("super.my_id;");
+int main (int argc, char** argv) {
+
+    std::ifstream stream;
+    if (argc < 2) 
+        stream.open("../example/Ejemplo1.cspt");
+
+    stream.open(argv[1]);
+
+    auto input = antlr4::ANTLRInputStream(stream);
     CompiScriptLexer lexer(&input);
     antlr4::CommonTokenStream tokens(&lexer);
     CompiScriptParser parser(&tokens);
