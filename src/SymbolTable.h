@@ -1,5 +1,6 @@
 #pragma once
 
+#include <any>
 #include <map>
 #include <string>
 #include <vector>
@@ -10,6 +11,8 @@ enum class SymbolType: int {
     VARIABLE,
     FUNCTION,
     CLASS,
+    OBJECT,
+    CLOUSURE,
     ARRAY
 };
 
@@ -18,16 +21,14 @@ enum class SymbolDataType: int {
     NUMBER,
     STRING,
     BOOLEAN,
-    OBJECT,
     NIL,
-    ANY // Placeholder para otros tipos
+    ANY 
 };
 
 /*
 name - Identificacion
 label - Etiqueta identificadora:
     Si es variable de tipo de dato OBJECT, indica la clase de la que es instancia.
-        Si es cualquier otro tipo de dato, indica el objeto al que pertenece.
     Si es funcion, indica a cual clase pertenece.
     Si es clase, indica de que clase hereda
 type - Tipo de simbolo
@@ -35,8 +36,8 @@ data_type - Tipo de dato.
     Si es función o cerradura, es nil o any.
     Si es clase u objeto, es any.
 value - Valor contenido en la variable.
-arg_list - Lista de argumentos para una funcion, una variable con argumentos es una cerradura.
-prop_list - Lista de propiedades de una clase, una variable con propiedades es un objeto.
+arg_list - Lista de argumentos para una funcion o cerradura.
+prop_list - Lista de propiedades de una clase u objeto.
 size - Tamaño del símbolo
 offset - ubicacion en memoria
 
@@ -46,7 +47,7 @@ struct SymbolData {
     std::string label;
     SymbolType type;
     SymbolDataType data_type; 
-    std::string value;
+    std::any value;
     std::vector<std::string> arg_list;
     std::vector<std::string> prop_list;
     int size;
