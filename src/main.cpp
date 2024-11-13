@@ -149,9 +149,21 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
         auto id = ctx->IDENTIFIER()->getText();
         auto [symbol, found] = table.find(id, label);
         if (!found)
-            std::cerr << "Error: Symbolo no definido" << "\n";
+            std::cerr << "Error: Symbolo no definido.\n";
         
         std::any assignment_value = visitAssignment(ctx->assignment());
+    }
+
+    any visitLogic_or(CompiScriptParser::Logic_orContext *ctx) override {
+        if (!ctx->logic_and(1))
+            return visitLogic_and(ctx->logic_and(0));
+
+        auto type1 = any_cast<SymbolType>(visitLogic_and(ctx->logic_and(0)));
+        auto type2 = any_cast<SymbolType>(visitLogic_and(ctx->logic_and(1)));
+
+        if (type1 != type2) {
+            std::cerr << "Error: Comparación entre tipos invalida.\n";
+        }
     }
 
     any visitInstantiation(CompiScriptParser::InstantiationContext *ctx) override {
