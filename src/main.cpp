@@ -180,9 +180,8 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
 
     any visitInstantiation(CompiScriptParser::InstantiationContext *ctx) override {
         string class_name = ctx->IDENTIFIER()->getText();
-        auto [symbol, found] = table.find(class_name);
 
-        if (!found) {
+        if (!table.find(class_name).second) {
             std::cerr << "No existe una clase con este nombre.\n";
         }
         // Check if arguments have been passed
