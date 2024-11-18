@@ -166,6 +166,18 @@ class CompiScriptSemanticChecker: public CompiScriptBaseVisitor
         }
     }
 
+    any visitLogic_and(CompiScriptParser::Logic_andContext *ctx) override {
+        if (!ctx->equality(1))
+            return visitEquality(ctx->equality(0));
+
+        auto type1 = any_cast<SymbolType>(visitEquality(ctx->equality(0)));
+        auto type2 = any_cast<SymbolType>(visitEquality(ctx->equality(1)));
+
+        if (type1 != type2) {
+            std::cerr << "Error: Comparación entre tipos invalida.\n";
+        }                        
+    }
+
     any visitInstantiation(CompiScriptParser::InstantiationContext *ctx) override {
         string class_name = ctx->IDENTIFIER()->getText();
         auto [symbol, found] = table.find(class_name);
